@@ -1,0 +1,71 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  schedule:
+    # Weekly build so the floating DMXCore.PluginSdk 1.* reference surfaces
+    # breakage from new SDK releases even when this repo is idle.
+    - cron: '35 6 * * 1'
+
+permissions:
+  contents: read
+  id-token: write  # OIDC token for nuget.org Trusted Publishing
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Test
+        run: dotnet test tests/DMXCore100.Govee.Tests --configuration Release
+
+      - name: Build and pack
+        run: ./pack.sh
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: govee-plugin
+          path: |
+            artifacts/*.dmxplugin
+            artifacts/*.nupkg
+
+      # Plugin registry: nuget.org is where DMX Core 100 devices browse,
+      # install and update plugins from, so pushing here IS the release.
+      # --skip-duplicate makes re-pushing an already published version a
+      # no-op, so bumping <Version> in the csproj is what publishes.
+      # A package pushed to nuget.org can never be deleted, so refuse a
+      # package that lacks the plugin payload (built with an SDK that
+      # predates registry packaging, or a broken pack) BEFORE logging in.
+      - name: Verify plugin package
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          pkg=$(ls artifacts/*.nupkg | head -1)
+          if ! unzip -l "$pkg" | grep -q 'content/plugin.dmxplugin'; then
+            echo "::error::$pkg lacks content/plugin.dmxplugin - not a DmxCorePlugin package"
+            exit 1
+          fi
+
+      # Keyless (Trusted Publishing): GitHub's OIDC token is exchanged for a
+      # one-hour nuget.org API key against the trusted-publishing policy
+      # registered on nuget.org for this repo + workflow file. NUGET_USER (repo
+      # or org Actions variable) is the nuget.org profile name that owns the policy.
+      - name: NuGet login (OIDC)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      - name: Publish to nuget.org
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          dotnet nuget push artifacts/*.nupkg \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" \
+            --skip-duplicate

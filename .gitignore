@@ -1,0 +1,9 @@
+bin/
+obj/
+artifacts/
+TestResults/
+.vs/
+*.user
+.DS_Store
+
+local-feed/*.nupkg

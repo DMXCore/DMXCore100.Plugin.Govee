@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- The SDK generates manifest.json and PluginBuildInfo from these -->
+    <PluginId>govee</PluginId>
+    <PluginDisplayName>Govee</PluginDisplayName>
+    <Version>1.0.0</Version>
+    <Authors>DMX Core</Authors>
+
+    <!-- Plugin registry (nuget.org) package metadata. DMXCore.Plugin.* is the
+         reserved first-party prefix; the package is produced by `dotnet pack`
+         via the DMXCore.PluginSdk pack targets. -->
+    <PackageId>DMXCore.Plugin.Govee</PackageId>
+    <Description>Govee output for the DMX Core 100 lighting controller: drives Govee WiFi LED strips, neon ropes, panels and lamps from DMX channel data over the Govee LAN API, no cloud account required.</Description>
+    <PackageProjectUrl>https://docs.dmxcore.com/dmx-core-100</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- Embedded icon (not iconUrl) is a nuget.org reserved-prefix review
+         criterion; icon.png is the same 128x128 logo the SDK packages ship. -->
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageTags>govee;lan;smart-lighting;led-strip</PackageTags>
+    <!-- Everything this plugin uses (plugin fixture profiles, generated
+         manifest, destination discovery) is SDK contract 1.6, so declare
+         that floor explicitly instead of inheriting whatever newer SDK the
+         floating 1.* reference happens to resolve to at build time. -->
+    <PluginMinSdkVersion>1.6</PluginMinSdkVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DMXCore100.Govee.Tests" />
+    <InternalsVisibleTo Include="DMXCore100.Govee.DevHost" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- ExcludeAssets="runtime": the DMX Core 100 host provides the SDK (and
+         its dependencies) at runtime and always resolves them to its own
+         copies, so they must not be shipped inside the .dmxplugin. -->
+    <PackageReference Include="DMXCore.PluginSdk" Version="1.*" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
+    <None Include="..\..\icon.png" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
+</Project>
