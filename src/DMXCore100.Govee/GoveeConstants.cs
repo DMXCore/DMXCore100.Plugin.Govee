@@ -28,6 +28,16 @@ internal static class GoveeConstants
     public const int MaxUpdatesPerSecond = 10;
 
     /// <summary>
+    /// Pause between the datagrams of one frame when it needs more than one
+    /// command. An H618A (WiFi fw 1.02.11) drops a datagram that arrives
+    /// back-to-back with the previous one — measured: 0 ms gap loses the
+    /// second command, 5 ms already works — so 15 ms leaves margin without
+    /// hurting the frame budget (worst case turn+brightness+colorwc is two
+    /// gaps, 30 ms of a 100 ms frame at 10 updates/s).
+    /// </summary>
+    public const int InterCommandGapMs = 15;
+
+    /// <summary>
     /// Brightness percent range of the <c>brightness</c> command.
     /// </summary>
     public const int MinBrightness = 1;

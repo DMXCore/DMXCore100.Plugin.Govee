@@ -72,8 +72,17 @@ internal sealed class GoveeSession : IPluginOutputSession
 
         try
         {
+            bool first = true;
             foreach (byte[] datagram in update.DatagramsSince(this.lastSent))
             {
+                if (!first)
+                {
+                    // The device drops back-to-back datagrams (see
+                    // GoveeConstants.InterCommandGapMs)
+                    await Task.Delay(GoveeConstants.InterCommandGapMs, cancellationToken);
+                }
+
+                first = false;
                 await this.io.Send(this.endpoint, datagram, cancellationToken);
             }
 

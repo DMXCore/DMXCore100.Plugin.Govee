@@ -46,8 +46,12 @@ The Core rate-limits each mapping to 10 updates/second and coalesces
 latest-wins. Govee splits power, brightness, and color over separate
 commands (`turn`, `brightness`, `colorwc`), so the plugin tracks what it
 last sent and emits only the commands that changed — a color fade at a
-steady hue is one `brightness` datagram per update. All channels at zero
-sends `turn 0` (device off).
+steady hue is one `brightness` datagram per update. When a frame does need
+several commands, the plugin paces them 15 ms apart: the device firmware
+processes one datagram at a time and silently drops one that arrives
+back-to-back with the previous (measured on an H618A — 0 ms loses the
+second command, 5 ms already works). All channels at zero sends `turn 0`
+(device off).
 
 **Brightness:** Govee renders `colorwc` as the color and a separate
 `brightness` percentage (1-100) as intensity. The plugin puts the level of
@@ -55,6 +59,10 @@ the brightest channel into `brightness` and normalizes the color channels
 toward 255, keeping the best color resolution across the whole fade.
 
 Requires a Core whose plugin SDK contract is **1.6** or newer.
+
+Verified on hardware with a Govee H618A RGBIC strip (WiFi firmware
+1.02.11): discovery, every protocol with `devStatus` readback, and 10 Hz
+fades through the low end.
 
 ## Troubleshooting
 
