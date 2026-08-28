@@ -41,6 +41,8 @@ drive the light through the normal lighting pipeline.
 | `GOVEE_COLOR` | Color Light / **RGB** | R, G, B | The whole device shows one color (the LAN API has no per-segment control) |
 | `GOVEE_WHITE_CT` | White Light / **Dimmer+CT** | Intensity, ColorTemperature | Kelvin mode: CT 0 = 2000 K (warm), 255 = 9000 K (cool); the device clamps to its own range |
 | `GOVEE_WHITE` | White Light / **Dimmer** | Intensity | Brightness only; the device keeps its current color |
+| `GOVEE_RT_COLOR` | Color Light / **RGB** | R, G, B | **Realtime (experimental)** — instant, no firmware fade; see below |
+| `GOVEE_RT_PIXEL` | — | R, G, B × segments | **Realtime (experimental)** — per-segment RGBIC control; see below |
 
 The Core rate-limits each mapping to 10 updates/second and coalesces
 latest-wins. Govee splits power, brightness, and color over separate
@@ -58,11 +60,36 @@ second command, 5 ms already works). All channels at zero sends `turn 0`
 the brightest channel into `brightness` and normalizes the color channels
 toward 255, keeping the best color resolution across the whole fade.
 
+## Realtime protocols (experimental)
+
+The plugin setting **Enable Realtime protocols (experimental)** adds two
+more protocols that stream colors over the reverse-engineered
+**razer/DreamView** mode — the transport Govee's own desktop app uses for
+music and video sync:
+
+- `GOVEE_RT_COLOR` — the whole device as one RGB zone, rendered
+  **instantly**: snaps, strobes, fast chases, and hard blackouts all work,
+  with none of the firmware fade of the standard commands.
+- `GOVEE_RT_PIXEL` — 3 channels per segment for **per-segment (RGBIC)
+  control**, which the official LAN API does not offer at all.
+
+Both take a **Segments** field on the mapping (the H618A exposes 15) — it
+sets the Pixel protocol's channel count and must match the device. Updates
+stream at up to 20 per second. While a realtime mapping is active the
+device is held in streaming mode (its app scenes don't render); it returns
+to normal when the output goes inactive.
+
+**This mode is not part of Govee's documented LAN API and is only
+verified on the H618A.** Other models may ignore it or behave
+unexpectedly — that is why it ships behind the setting, off by default.
+The standard protocols are unaffected either way.
+
 Requires a Core whose plugin SDK contract is **1.6** or newer.
 
 Verified on hardware with a Govee H618A RGBIC strip (WiFi firmware
-1.02.11): discovery, every protocol with `devStatus` readback, and 10 Hz
-fades through the low end.
+1.02.11): discovery, every protocol with `devStatus` readback, 10 Hz fades
+through the low end, and the realtime protocols (instant snaps, a 5 Hz
+strobe, and a per-segment chase).
 
 ## Troubleshooting
 
@@ -82,15 +109,15 @@ fades through the low end.
   fixture is patched to a Govee profile whose personality matches the
   protocol, and that the output is enabled. Command port 4003 must be
   reachable.
-- **Whole strip changes color at once:** that is the LAN API — it exposes
-  the device as a single zone; per-segment (RGBIC) control is not part of
-  the public protocol.
+- **Whole strip changes color at once:** the official LAN API exposes the
+  device as a single zone; per-segment (RGBIC) control needs the
+  experimental Realtime Pixel protocol (H618A only).
 - **Everything fades instead of snapping:** that is the Govee firmware —
-  color, brightness, and power changes are all smoothed over a fixed fade
-  the LAN API cannot shorten (verified on an H618A: no command lands as a
-  hard snap). Slow fades and gentle effects look great; strobes, fast
-  chases, and hard blackouts will smear together and are not achievable on
-  Govee devices.
+  color, brightness, and power changes on the standard protocols are all
+  smoothed over a fixed fade the LAN API cannot shorten (verified on an
+  H618A: no command lands as a hard snap). Slow fades and gentle effects
+  look great; for strobes, fast chases, and hard blackouts use the
+  experimental **Realtime** protocols instead (H618A only).
 - **Wrong device:** destination is the IP address. Re-run Discover after a
   DHCP change, or set a static lease.
 - **Plugin will not load:** the device firmware must expose SDK 1.6+.
@@ -123,6 +150,7 @@ send 192.168.1.30 255 0 0
 sendwhite 192.168.1.30 200 0              # kelvin mode, warm
 senddim 192.168.1.30 128
 fade 192.168.1.30 6                       # red ramp at the streaming rate
+rt 192.168.1.30                           # realtime demo: snaps, 5 Hz strobe, segment chase
 raw 192.168.1.30 {"msg":{"cmd":"devStatus","data":{}}}
 r                                         # shutdown + initialize again
 d                                         # dump registered protocols / profiles

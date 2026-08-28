@@ -14,13 +14,23 @@ public class GoveePlugin : IPlugin
     public const string ColorProtocolId = "GOVEE_COLOR";
     public const string WhiteCtProtocolId = "GOVEE_WHITE_CT";
     public const string WhiteProtocolId = "GOVEE_WHITE";
+    public const string RealtimeColorProtocolId = "GOVEE_RT_COLOR";
+    public const string RealtimePixelProtocolId = "GOVEE_RT_PIXEL";
     public const string ColorProfileCode = "GOVEE_COLOR";
     public const string WhiteProfileCode = "GOVEE_WHITE";
     public const string PortType = "GOVEE";
+    public const string RealtimeEnabledSettingKey = "realtime-enabled";
+    public const string SegmentsOptionKey = "segments";
+    public const int DefaultSegments = 15;
+    public const int RealtimeMaxUpdatesPerSecond = 20;
 
     private readonly List<IDisposable> registrations = [];
+    private readonly List<IDisposable> realtimeRegistrations = [];
+    private readonly object realtimeGate = new();
     private readonly GoveeDiscoverFunc? discoverOverride;
     private readonly GoveeDatagramSender? sendOverride;
+    private IPluginHost? host;
+    private GoveeDiscovery? discovery;
 
     public GoveePlugin()
         : this(null, null)
@@ -40,6 +50,21 @@ public class GoveePlugin : IPlugin
             Name = PluginBuildInfo.Name,
             Version = PluginBuildInfo.Version,
             Description = "Drives Govee WiFi lights from DMX over the Govee LAN API (LAN Control must be enabled per device in the Govee Home app).",
+            Settings =
+            [
+                new()
+                {
+                    Key = RealtimeEnabledSettingKey,
+                    Label = "Enable Realtime protocols (experimental)",
+                    Type = PluginSettingType.Boolean,
+                    DefaultValue = "false",
+                    Description = "Adds Govee Realtime output protocols that stream colors over the "
+                        + "reverse-engineered razer/DreamView mode: instant changes with no firmware "
+                        + "fade, and per-segment control on RGBIC devices. Not part of Govee's "
+                        + "documented LAN API — only verified on the H618A; other models may ignore "
+                        + "it or behave unexpectedly.",
+                },
+            ],
         };
     }
 
@@ -67,6 +92,15 @@ public class GoveePlugin : IPlugin
                 new GoveeProtocol(mode, discovery, this.sendOverride)));
         }
 
+        this.host = host;
+        this.discovery = discovery;
+        SyncRealtimeRegistrations();
+        this.registrations.Add(host.Settings.OnChanged(_ =>
+        {
+            SyncRealtimeRegistrations();
+            return Task.CompletedTask;
+        }));
+
         host.SetConnectionState(true, "Govee output ready");
         return Task.CompletedTask;
     }
@@ -79,7 +113,59 @@ public class GoveePlugin : IPlugin
         }
 
         this.registrations.Clear();
+        lock (this.realtimeGate)
+        {
+            foreach (IDisposable registration in this.realtimeRegistrations)
+            {
+                registration.Dispose();
+            }
+
+            this.realtimeRegistrations.Clear();
+        }
+
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Register or unregister the realtime (razer-mode) protocols to match
+    /// the enable setting. Mappings bound to them while disabled degrade to
+    /// non-rendering, the same as when a plugin is stopped.
+    /// </summary>
+    private void SyncRealtimeRegistrations()
+    {
+        bool enabled = this.host!.Settings.GetBoolean(RealtimeEnabledSettingKey) ?? false;
+        lock (this.realtimeGate)
+        {
+            if (enabled == this.realtimeRegistrations.Count > 0)
+            {
+                return;
+            }
+
+            if (enabled)
+            {
+                this.realtimeRegistrations.Add(this.host.Outputs.RegisterOutputProtocol(
+                    RealtimeDescriptor(
+                        RealtimeColorProtocolId,
+                        "Govee Realtime RGB (H618A)",
+                        suggestProfile: true),
+                    new GoveeRealtimeProtocol(pixel: false, this.discovery!, this.sendOverride)));
+                this.realtimeRegistrations.Add(this.host.Outputs.RegisterOutputProtocol(
+                    RealtimeDescriptor(
+                        RealtimePixelProtocolId,
+                        "Govee Realtime Pixel (H618A)",
+                        suggestProfile: false),
+                    new GoveeRealtimeProtocol(pixel: true, this.discovery!, this.sendOverride)));
+            }
+            else
+            {
+                foreach (IDisposable registration in this.realtimeRegistrations)
+                {
+                    registration.Dispose();
+                }
+
+                this.realtimeRegistrations.Clear();
+            }
+        }
     }
 
     private static PluginFixtureProfileDescriptor Profile(string code, string name, IReadOnlyList<GoveeMode> modes) =>
@@ -95,6 +181,31 @@ public class GoveePlugin : IPlugin
                     Channels = mode.Channels,
                 })
                 .ToArray(),
+        };
+
+    private static OutputProtocolDescriptor RealtimeDescriptor(string id, string displayName, bool suggestProfile) =>
+        new()
+        {
+            Id = id,
+            DisplayName = displayName,
+            PortType = PortType,
+            PortTypeDisplayName = "Govee",
+            MaxUpdatesPerSecond = RealtimeMaxUpdatesPerSecond,
+            SupportsDestinationDiscovery = true,
+            SuggestedProfileCode = suggestProfile ? ColorProfileCode : null,
+            SuggestedPersonality = suggestProfile ? "RGB" : null,
+            MappingFields =
+            [
+                new()
+                {
+                    Key = SegmentsOptionKey,
+                    Label = "Segments",
+                    Type = PluginSettingType.Integer,
+                    DefaultValue = "15",
+                    Description = "Addressable segments of the device (H618A: 15). The Pixel protocol "
+                        + "uses 3 channels per segment.",
+                },
+            ],
         };
 
     private static OutputProtocolDescriptor Descriptor(GoveeMode mode) =>

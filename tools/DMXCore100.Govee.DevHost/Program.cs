@@ -12,6 +12,8 @@ using DMXCore100.Govee;
 
 GoveePlugin plugin = new();
 var host = new TestPluginHost(plugin.Info);
+// The dev harness always exposes the experimental realtime protocols
+host.SetSetting(GoveePlugin.RealtimeEnabledSettingKey, "true");
 using var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, args) =>
 {
@@ -186,6 +188,65 @@ try
                     break;
                 }
 
+                case "rt":
+                {
+                    // Realtime (razer mode) demo through ONE session: color
+                    // snaps, a 5 Hz strobe, and a per-segment chase — all
+                    // things the normal LAN commands smear with their fade
+                    if (parts.Length < 2)
+                    {
+                        Console.WriteLine("usage: rt <ip> [segments]");
+                        break;
+                    }
+
+                    int segments = parts.Length > 2 && int.TryParse(parts[2], out int s) ? s : GoveePlugin.DefaultSegments;
+                    PluginOutputMappingConfig mapping = new()
+                    {
+                        DestinationAddress = parts[1],
+                        ChannelOffset = 0,
+                        UniverseId = 1,
+                        Options = new Dictionary<string, string> { [GoveePlugin.SegmentsOptionKey] = segments.ToString() },
+                    };
+
+                    Console.WriteLine("  snap test: red / blue, 1 s each");
+                    IPluginOutputSession rgb = await host.OutputProtocols[GoveePlugin.RealtimeColorProtocolId].Protocol
+                        .OpenSessionAsync(mapping, cts.Token);
+                    await using (rgb)
+                    {
+                        await rgb.SendAsync(new byte[] { 255, 0, 0 }, cts.Token);
+                        await Task.Delay(1000, cts.Token);
+                        await rgb.SendAsync(new byte[] { 0, 0, 255 }, cts.Token);
+                        await Task.Delay(1000, cts.Token);
+
+                        Console.WriteLine("  strobe: red/black at 5 Hz for 3 s");
+                        for (int i = 0; i < 15 && !cts.IsCancellationRequested; i++)
+                        {
+                            await rgb.SendAsync(i % 2 == 0 ? new byte[] { 255, 0, 0 } : new byte[] { 0, 0, 0 }, cts.Token);
+                            await Task.Delay(200, cts.Token);
+                        }
+                    }
+
+                    Console.WriteLine($"  chase: one white segment sweeping {segments} segments");
+                    IPluginOutputSession px = await host.OutputProtocols[GoveePlugin.RealtimePixelProtocolId].Protocol
+                        .OpenSessionAsync(mapping, cts.Token);
+                    await using (px)
+                    {
+                        for (int step = 0; step < segments * 2 && !cts.IsCancellationRequested; step++)
+                        {
+                            byte[] slice = new byte[segments * 3];
+                            int lit = step % segments;
+                            slice[(lit * 3) + 0] = 255;
+                            slice[(lit * 3) + 1] = 255;
+                            slice[(lit * 3) + 2] = 255;
+                            await px.SendAsync(slice, cts.Token);
+                            await Task.Delay(100, cts.Token);
+                        }
+                    }
+
+                    Console.WriteLine("  rt demo done (device back in normal mode)");
+                    break;
+                }
+
                 case "status":
                     if (parts.Length < 2)
                     {
@@ -310,6 +371,7 @@ static void PrintHelp()
           senddim <ip> dim              GOVEE_WHITE (brightness only)
           sendmode <proto> <ip> ch...   any protocol id with a raw slice
           fade <ip> [seconds]           red 0→255→0 ramp at 10 updates/s (one session)
+          rt <ip> [segments]            realtime (razer) demo: snaps, 5 Hz strobe, segment chase
           status <ip>                   print devStatus
           raw <ip> <json>               send any JSON and print the reply
           r                             shutdown + initialize again (no assembly unload)
