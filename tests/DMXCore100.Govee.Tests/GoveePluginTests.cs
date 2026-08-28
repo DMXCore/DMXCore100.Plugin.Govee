@@ -64,7 +64,8 @@ public class GoveePluginTests
         Assert.IsTrue(host.OutputProtocols.ContainsKey(GoveePlugin.ColorProtocolId));
         Assert.IsTrue(host.OutputProtocols.ContainsKey(GoveePlugin.WhiteCtProtocolId));
         Assert.IsTrue(host.OutputProtocols.ContainsKey(GoveePlugin.WhiteProtocolId));
-        Assert.AreEqual(3, host.OutputProtocols.Count);
+        // Plus the two realtime protocols, on by default (GoveeRealtimeTests)
+        Assert.AreEqual(5, host.OutputProtocols.Count);
         Assert.IsTrue(host.FixtureProfiles.ContainsKey(GoveePlugin.ColorProfileCode));
         Assert.IsTrue(host.FixtureProfiles.ContainsKey(GoveePlugin.WhiteProfileCode));
         Assert.AreEqual(true, host.ConnectionState);

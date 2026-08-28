@@ -27,6 +27,19 @@ internal sealed class GoveeDevice
 
     public string WifiVersion { get; set; } = "";
 
+    /// <summary>
+    /// Razer-mode segment counts of models this has been measured on; used
+    /// to prefill the realtime protocols' Segments mapping field from
+    /// discovery. The LAN API has no query for it, so unknown models keep
+    /// the default and the user sets the field by hand.
+    /// </summary>
+    public static int? KnownSegments(string sku) =>
+        sku.ToUpperInvariant() switch
+        {
+            "H618A" => 15,
+            _ => null,
+        };
+
     internal static string DestinationLabel(GoveeDevice device)
     {
         string name = string.IsNullOrWhiteSpace(device.Sku) ? "Govee" : $"Govee {device.Sku}";

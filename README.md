@@ -41,8 +41,8 @@ drive the light through the normal lighting pipeline.
 | `GOVEE_COLOR` | Color Light / **RGB** | R, G, B | The whole device shows one color (the LAN API has no per-segment control) |
 | `GOVEE_WHITE_CT` | White Light / **Dimmer+CT** | Intensity, ColorTemperature | Kelvin mode: CT 0 = 2000 K (warm), 255 = 9000 K (cool); the device clamps to its own range |
 | `GOVEE_WHITE` | White Light / **Dimmer** | Intensity | Brightness only; the device keeps its current color |
-| `GOVEE_RT_COLOR` | Color Light / **RGB** | R, G, B | **Realtime (experimental)** — instant, no firmware fade; see below |
-| `GOVEE_RT_PIXEL` | — | R, G, B × segments | **Realtime (experimental)** — per-segment RGBIC control; see below |
+| `GOVEE_RT_COLOR` | Color Light / **RGB** | R, G, B | **Realtime** — instant, no firmware fade; recommended for cues and effects; see below |
+| `GOVEE_RT_PIXEL` | — | R, G, B × segments | **Realtime** — per-segment RGBIC control; see below |
 
 The Core rate-limits each mapping to 10 updates/second and coalesces
 latest-wins. Govee splits power, brightness, and color over separate
@@ -60,12 +60,12 @@ second command, 5 ms already works). All channels at zero sends `turn 0`
 the brightest channel into `brightness` and normalizes the color channels
 toward 255, keeping the best color resolution across the whole fade.
 
-## Realtime protocols (experimental)
+## Realtime protocols
 
-The plugin setting **Enable Realtime protocols (experimental)** adds two
-more protocols that stream colors over the reverse-engineered
-**razer/DreamView** mode — the transport Govee's own desktop app uses for
-music and video sync:
+The Realtime protocols — **the recommended way to drive Govee from cues,
+effects, and anything with timing** — stream colors over the
+reverse-engineered **razer/DreamView** mode, the transport Govee's own
+desktop app uses for music and video sync:
 
 - `GOVEE_RT_COLOR` — the whole device as one RGB zone, rendered
   **instantly**: snaps, strobes, fast chases, and hard blackouts all work,
@@ -73,16 +73,25 @@ music and video sync:
 - `GOVEE_RT_PIXEL` — 3 channels per segment for **per-segment (RGBIC)
   control**, which the official LAN API does not offer at all.
 
-Both take a **Segments** field on the mapping (the H618A exposes 15) — it
-sets the Pixel protocol's channel count and must match the device. Updates
-stream at up to 20 per second. While a realtime mapping is active the
-device is held in streaming mode (its app scenes don't render); it returns
-to normal when the output goes inactive.
+Both take a **Segments** field on the mapping (the H618A exposes 15;
+prefilled when Discover recognizes the model) — it sets the Pixel
+protocol's channel count and must match the device. Updates stream at up
+to 40 per second (one datagram per frame; an H618A stayed fluid at 60 Hz).
+While a realtime mapping is active the device is held in streaming mode
+(its app scenes don't render); it returns to normal when the output goes
+inactive.
 
-**This mode is not part of Govee's documented LAN API and is only
-verified on the H618A.** Other models may ignore it or behave
-unexpectedly — that is why it ships behind the setting, off by default.
-The standard protocols are unaffected either way.
+This mode is not part of Govee's documented LAN API. The packet format is
+shared across Govee's WiFi RGBIC line (it is the same protocol community
+projects like OpenRGB use on the H6159/H616x/H618x/H619x/H61A0 families),
+but it has only been **verified on the H618A** here. It is on by default;
+if your model ignores it or misbehaves, switch the **Realtime protocols**
+plugin setting off and use the standard protocols — and consider opening
+an issue or PR, the plugin is open source.
+
+The standard protocols exist for everything else: models where realtime
+turns out not to work, and slow ambient content (schedules, gentle washes)
+where the firmware fade is actually pleasant.
 
 Requires a Core whose plugin SDK contract is **1.6** or newer.
 
@@ -110,14 +119,14 @@ strobe, and a per-segment chase).
   protocol, and that the output is enabled. Command port 4003 must be
   reachable.
 - **Whole strip changes color at once:** the official LAN API exposes the
-  device as a single zone; per-segment (RGBIC) control needs the
-  experimental Realtime Pixel protocol (H618A only).
+  device as a single zone; per-segment (RGBIC) control needs the Realtime
+  Pixel protocol.
 - **Everything fades instead of snapping:** that is the Govee firmware —
   color, brightness, and power changes on the standard protocols are all
   smoothed over a fixed fade the LAN API cannot shorten (verified on an
   H618A: no command lands as a hard snap). Slow fades and gentle effects
   look great; for strobes, fast chases, and hard blackouts use the
-  experimental **Realtime** protocols instead (H618A only).
+  **Realtime** protocols instead (the default recommendation).
 - **Wrong device:** destination is the IP address. Re-run Discover after a
   DHCP change, or set a static lease.
 - **Plugin will not load:** the device firmware must expose SDK 1.6+.

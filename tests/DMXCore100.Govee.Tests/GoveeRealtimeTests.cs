@@ -72,9 +72,19 @@ public class GoveeRealtimeTests
     }
 
     [TestMethod]
-    public async Task Initialize_RealtimeProtocolsAbsentByDefault()
+    public async Task Initialize_RealtimeProtocolsPresentByDefault()
     {
         var (_, host, _) = await CreateInitializedAsync(realtimeEnabled: null);
+
+        Assert.AreEqual(5, host.OutputProtocols.Count);
+        Assert.IsTrue(host.OutputProtocols.ContainsKey(GoveePlugin.RealtimeColorProtocolId));
+        Assert.IsTrue(host.OutputProtocols.ContainsKey(GoveePlugin.RealtimePixelProtocolId));
+    }
+
+    [TestMethod]
+    public async Task Initialize_SettingDisablesRealtimeProtocols()
+    {
+        var (_, host, _) = await CreateInitializedAsync(realtimeEnabled: false);
 
         Assert.AreEqual(3, host.OutputProtocols.Count);
         Assert.IsFalse(host.OutputProtocols.ContainsKey(GoveePlugin.RealtimeColorProtocolId));
@@ -82,20 +92,20 @@ public class GoveeRealtimeTests
     }
 
     [TestMethod]
-    public async Task Initialize_SettingRegistersRealtimeProtocols()
+    public async Task Initialize_RealtimeDescriptors()
     {
         var (_, host, _) = await CreateInitializedAsync(realtimeEnabled: true);
 
         Assert.AreEqual(5, host.OutputProtocols.Count);
         OutputProtocolDescriptor color = host.OutputProtocols[GoveePlugin.RealtimeColorProtocolId].Descriptor;
-        Assert.AreEqual("Govee Realtime RGB (H618A)", color.DisplayName);
+        Assert.AreEqual("Govee Realtime RGB", color.DisplayName);
         Assert.AreEqual(GoveePlugin.RealtimeMaxUpdatesPerSecond, color.MaxUpdatesPerSecond);
         Assert.AreEqual(GoveePlugin.ColorProfileCode, color.SuggestedProfileCode);
         Assert.AreEqual("RGB", color.SuggestedPersonality);
         Assert.AreEqual(GoveePlugin.SegmentsOptionKey, color.MappingFields.Single().Key);
 
         OutputProtocolDescriptor pixel = host.OutputProtocols[GoveePlugin.RealtimePixelProtocolId].Descriptor;
-        Assert.AreEqual("Govee Realtime Pixel (H618A)", pixel.DisplayName);
+        Assert.AreEqual("Govee Realtime Pixel", pixel.DisplayName);
         Assert.IsNull(pixel.SuggestedProfileCode);
         Assert.AreEqual(GoveePlugin.SegmentsOptionKey, pixel.MappingFields.Single().Key);
     }
@@ -104,16 +114,30 @@ public class GoveeRealtimeTests
     public async Task SettingsChange_TogglesRealtimeProtocolsLive()
     {
         var (_, host, _) = await CreateInitializedAsync(realtimeEnabled: null);
-        Assert.AreEqual(3, host.OutputProtocols.Count);
-
-        host.SetSetting(GoveePlugin.RealtimeEnabledSettingKey, "true");
-        await host.TriggerSettingsChangedAsync();
         Assert.AreEqual(5, host.OutputProtocols.Count);
 
         host.SetSetting(GoveePlugin.RealtimeEnabledSettingKey, "false");
         await host.TriggerSettingsChangedAsync();
         Assert.AreEqual(3, host.OutputProtocols.Count);
         Assert.IsFalse(host.OutputProtocols.ContainsKey(GoveePlugin.RealtimeColorProtocolId));
+
+        host.SetSetting(GoveePlugin.RealtimeEnabledSettingKey, "true");
+        await host.TriggerSettingsChangedAsync();
+        Assert.AreEqual(5, host.OutputProtocols.Count);
+    }
+
+    [TestMethod]
+    public async Task Discover_PrefillsSegmentsForKnownModels()
+    {
+        var (_, host, _) = await CreateInitializedAsync(realtimeEnabled: true);
+        IPluginOutputProtocol protocol = host.OutputProtocols[GoveePlugin.RealtimeColorProtocolId].Protocol;
+
+        IReadOnlyList<PluginOutputDestinationOption>? options =
+            await protocol.GetDestinationOptionsAsync(refresh: true, CancellationToken.None);
+
+        Assert.IsNotNull(options);
+        Assert.AreEqual("15", options[0].Options?[GoveePlugin.SegmentsOptionKey]);
+        Assert.IsNull(GoveeDevice.KnownSegments("H9999"));
     }
 
     [TestMethod]

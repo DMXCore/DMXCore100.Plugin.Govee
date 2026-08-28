@@ -22,7 +22,13 @@ public class GoveePlugin : IPlugin
     public const string RealtimeEnabledSettingKey = "realtime-enabled";
     public const string SegmentsOptionKey = "segments";
     public const int DefaultSegments = 15;
-    public const int RealtimeMaxUpdatesPerSecond = 20;
+
+    /// <summary>
+    /// Razer-mode streaming rate: one datagram per frame, and the H618A
+    /// accepts datagrams 5 ms apart (measured) with a chase still fluid at
+    /// 60 Hz — 40 matches the engine's default output frequency with margin.
+    /// </summary>
+    public const int RealtimeMaxUpdatesPerSecond = 40;
 
     private readonly List<IDisposable> registrations = [];
     private readonly List<IDisposable> realtimeRegistrations = [];
@@ -55,14 +61,15 @@ public class GoveePlugin : IPlugin
                 new()
                 {
                     Key = RealtimeEnabledSettingKey,
-                    Label = "Enable Realtime protocols (experimental)",
+                    Label = "Realtime protocols",
                     Type = PluginSettingType.Boolean,
-                    DefaultValue = "false",
-                    Description = "Adds Govee Realtime output protocols that stream colors over the "
+                    DefaultValue = "true",
+                    Description = "The Realtime output protocols stream colors over the "
                         + "reverse-engineered razer/DreamView mode: instant changes with no firmware "
-                        + "fade, and per-segment control on RGBIC devices. Not part of Govee's "
-                        + "documented LAN API — only verified on the H618A; other models may ignore "
-                        + "it or behave unexpectedly.",
+                        + "fade, and per-segment control on RGBIC devices — the recommended way to "
+                        + "drive Govee from cues and effects. Not part of Govee's documented LAN "
+                        + "API (verified on the H618A); turn this off if your device ignores them "
+                        + "or misbehaves and use the standard protocols instead.",
                 },
             ],
         };
@@ -133,7 +140,7 @@ public class GoveePlugin : IPlugin
     /// </summary>
     private void SyncRealtimeRegistrations()
     {
-        bool enabled = this.host!.Settings.GetBoolean(RealtimeEnabledSettingKey) ?? false;
+        bool enabled = this.host!.Settings.GetBoolean(RealtimeEnabledSettingKey) ?? true;
         lock (this.realtimeGate)
         {
             if (enabled == this.realtimeRegistrations.Count > 0)
@@ -146,13 +153,13 @@ public class GoveePlugin : IPlugin
                 this.realtimeRegistrations.Add(this.host.Outputs.RegisterOutputProtocol(
                     RealtimeDescriptor(
                         RealtimeColorProtocolId,
-                        "Govee Realtime RGB (H618A)",
+                        "Govee Realtime RGB",
                         suggestProfile: true),
                     new GoveeRealtimeProtocol(pixel: false, this.discovery!, this.sendOverride)));
                 this.realtimeRegistrations.Add(this.host.Outputs.RegisterOutputProtocol(
                     RealtimeDescriptor(
                         RealtimePixelProtocolId,
-                        "Govee Realtime Pixel (H618A)",
+                        "Govee Realtime Pixel",
                         suggestProfile: false),
                     new GoveeRealtimeProtocol(pixel: true, this.discovery!, this.sendOverride)));
             }

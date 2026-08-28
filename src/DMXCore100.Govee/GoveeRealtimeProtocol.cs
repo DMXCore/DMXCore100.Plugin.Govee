@@ -53,7 +53,13 @@ internal sealed class GoveeRealtimeProtocol : IPluginOutputProtocol
         return devices
             .Select(static device => new PluginOutputDestinationOption(
                 device.Ip,
-                GoveeDevice.DestinationLabel(device)))
+                GoveeDevice.DestinationLabel(device))
+            {
+                // Prefill the Segments mapping field for models we know
+                Options = GoveeDevice.KnownSegments(device.Sku) is int segments
+                    ? new Dictionary<string, string> { [GoveePlugin.SegmentsOptionKey] = segments.ToString() }
+                    : null,
+            })
             .ToArray();
     }
 }

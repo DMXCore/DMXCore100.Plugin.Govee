@@ -7,7 +7,7 @@
     <!-- The SDK generates manifest.json and PluginBuildInfo from these -->
     <PluginId>govee</PluginId>
     <PluginDisplayName>Govee</PluginDisplayName>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Authors>DMX Core</Authors>
 
     <!-- Plugin registry (nuget.org) package metadata. DMXCore.Plugin.* is the
