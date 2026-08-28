@@ -73,6 +73,11 @@ fades through the low end.
 - **Discover fails immediately:** replies arrive on the fixed UDP port
   4002; another Govee integration bound exclusively to it (Home Assistant,
   govee2mqtt) on the same host can block the scan.
+- **Discover is empty or intermittent on a Windows Core:** Windows
+  Defender Firewall must allow the DMX Core executable to receive inbound
+  UDP on port 4002 for the active network profile (usually Private) —
+  without that rule the scan replies are silently dropped even though
+  commands to the lights still work.
 - **Device does not follow cues:** check the mapping's IP, that the
   fixture is patched to a Govee profile whose personality matches the
   protocol, and that the output is enabled. Command port 4003 must be
@@ -80,6 +85,12 @@ fades through the low end.
 - **Whole strip changes color at once:** that is the LAN API — it exposes
   the device as a single zone; per-segment (RGBIC) control is not part of
   the public protocol.
+- **Everything fades instead of snapping:** that is the Govee firmware —
+  color, brightness, and power changes are all smoothed over a fixed fade
+  the LAN API cannot shorten (verified on an H618A: no command lands as a
+  hard snap). Slow fades and gentle effects look great; strobes, fast
+  chases, and hard blackouts will smear together and are not achievable on
+  Govee devices.
 - **Wrong device:** destination is the IP address. Re-run Discover after a
   DHCP change, or set a static lease.
 - **Plugin will not load:** the device firmware must expose SDK 1.6+.
