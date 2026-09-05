@@ -7,7 +7,7 @@
     <!-- The SDK generates manifest.json and PluginBuildInfo from these -->
     <PluginId>govee</PluginId>
     <PluginDisplayName>Govee</PluginDisplayName>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <Authors>DMX Core</Authors>
 
     <!-- Plugin registry (nuget.org) package metadata. DMXCore.Plugin.* is the
@@ -15,7 +15,9 @@
          via the DMXCore.PluginSdk pack targets. -->
     <PackageId>DMXCore.Plugin.Govee</PackageId>
     <Description>Govee output for the DMX Core 100 lighting controller: drives Govee WiFi LED strips, neon ropes, panels and lamps from DMX channel data over the Govee LAN API, no cloud account required.</Description>
-    <PackageProjectUrl>https://docs.dmxcore.com/dmx-core-100</PackageProjectUrl>
+    <PackageProjectUrl>https://docs.dmxcore.com/dmx-core-100/integrations/govee</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/DMXCore/DMXCore100.Plugin.Govee</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <!-- Embedded icon (not iconUrl) is a nuget.org reserved-prefix review
