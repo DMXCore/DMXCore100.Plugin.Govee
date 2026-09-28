@@ -28,6 +28,17 @@ internal static class GoveeConstants
     public const int MaxUpdatesPerSecond = 10;
 
     /// <summary>
+    /// Every protocol declares this as its RefreshInterval (SDK contract
+    /// 1.13): while a look holds still the host re-delivers it this often.
+    /// The command session answers a re-delivery with the full state
+    /// (turn + brightness + colorwc, or turn off) instead of its usual
+    /// changes-only diff, and the realtime session re-arms razer mode, so a
+    /// device changed from the Govee app or a scene returns to the Core's
+    /// state.
+    /// </summary>
+    public const int RefreshIntervalMs = 2000;
+
+    /// <summary>
     /// Pause between the datagrams of one frame when it needs more than one
     /// command. An H618A (WiFi fw 1.02.11) drops a datagram that arrives
     /// back-to-back with the previous one — measured: 0 ms gap loses the

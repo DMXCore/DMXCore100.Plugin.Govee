@@ -76,15 +76,29 @@ internal sealed class GoveeRealtimeSession : IPluginOutputSession
     private readonly int segments;
     private readonly IPEndPoint endpoint;
     private readonly GoveeSessionIo io;
+    private readonly TimeSpan refreshInterval;
     private long lastSentAt;
+    private long lastArmedAt;
+    private byte[]? lastFrame;
     private bool armed;
 
-    public GoveeRealtimeSession(bool pixel, int segments, IPEndPoint endpoint, GoveeDatagramSender? sender)
+    /// <param name="refreshInterval">
+    /// How old the last razer enable must be before an unchanged frame (the
+    /// host's idle refresh) re-arms; defaults to
+    /// <see cref="GoveeConstants.RefreshIntervalMs"/>.
+    /// </param>
+    public GoveeRealtimeSession(
+        bool pixel,
+        int segments,
+        IPEndPoint endpoint,
+        GoveeDatagramSender? sender,
+        TimeSpan? refreshInterval = null)
     {
         this.pixel = pixel;
         this.segments = segments;
         this.endpoint = endpoint;
         this.io = new GoveeSessionIo(endpoint, sender);
+        this.refreshInterval = refreshInterval ?? TimeSpan.FromMilliseconds(GoveeConstants.RefreshIntervalMs);
     }
 
     public async Task<bool> SendAsync(ReadOnlyMemory<byte> channelValues, CancellationToken cancellationToken)
@@ -94,24 +108,35 @@ internal sealed class GoveeRealtimeSession : IPluginOutputSession
             return false;
         }
 
+        ReadOnlySpan<byte> channels = channelValues.Span;
+        byte[] frame = this.pixel
+            ? GoveeRazer.Pixels(channels, this.segments)
+            : GoveeRazer.Solid(channels[0], channels[1], channels[2], this.segments);
+        long now = Environment.TickCount64;
+
+        // An unchanged frame is the host's idle refresh. The Govee app (or a
+        // scene) drops the device out of razer mode without telling us, and
+        // frames are ignored until it is re-armed, so a refresh re-arms once
+        // the last enable is old enough. Active streaming never pays the gap.
+        bool refresh = this.lastFrame != null && frame.AsSpan().SequenceEqual(this.lastFrame);
+
         try
         {
             if (!this.armed
-                || Environment.TickCount64 - this.lastSentAt > ReArmAfter.TotalMilliseconds)
+                || now - this.lastSentAt > ReArmAfter.TotalMilliseconds
+                || (refresh && now - this.lastArmedAt >= this.refreshInterval.TotalMilliseconds))
             {
                 await this.io.Send(this.endpoint, GoveeRazer.Enable, cancellationToken);
                 // The device drops a datagram arriving back-to-back with the
                 // previous one (see GoveeConstants.InterCommandGapMs)
                 await Task.Delay(GoveeConstants.InterCommandGapMs, cancellationToken);
                 this.armed = true;
+                this.lastArmedAt = now;
             }
 
-            ReadOnlySpan<byte> channels = channelValues.Span;
-            byte[] frame = this.pixel
-                ? GoveeRazer.Pixels(channels, this.segments)
-                : GoveeRazer.Solid(channels[0], channels[1], channels[2], this.segments);
             await this.io.Send(this.endpoint, frame, cancellationToken);
             this.lastSentAt = Environment.TickCount64;
+            this.lastFrame = frame;
             return true;
         }
         catch (SocketException)

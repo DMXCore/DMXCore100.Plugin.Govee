@@ -55,6 +55,12 @@ back-to-back with the previous (measured on an H618A — 0 ms loses the
 second command, 5 ms already works). All channels at zero sends `turn 0`
 (device off).
 
+While a look holds still, the Core re-sends it every 2 seconds: the
+command protocols answer with the full state (`turn` + `brightness` +
+`colorwc`, or `turn 0`) instead of the changes-only diff, and the Realtime
+protocols re-arm razer mode, so a device changed from the Govee app or a
+scene returns to the Core's state.
+
 **Brightness:** Govee renders `colorwc` as the color and a separate
 `brightness` percentage (1-100) as intensity. The plugin puts the level of
 the brightest channel into `brightness` and normalizes the color channels
@@ -93,7 +99,8 @@ The standard protocols exist for everything else: models where realtime
 turns out not to work, and slow ambient content (schedules, gentle washes)
 where the firmware fade is actually pleasant.
 
-Requires a Core whose plugin SDK contract is **1.6** or newer.
+Requires a Core whose plugin SDK contract is **1.13** or newer (the idle
+re-send). Older Cores stay on plugin 1.2.1.
 
 Verified on hardware with a Govee H618A RGBIC strip (WiFi firmware
 1.02.11): discovery, every protocol with `devStatus` readback, 10 Hz fades
@@ -129,7 +136,7 @@ strobe, and a per-segment chase).
   **Realtime** protocols instead (the default recommendation).
 - **Wrong device:** destination is the IP address. Re-run Discover after a
   DHCP change, or set a static lease.
-- **Plugin will not load:** the device firmware must expose SDK 1.6+.
+- **Plugin will not load:** the device firmware must expose SDK 1.13+.
 
 ## Development
 
@@ -142,7 +149,7 @@ dotnet test tests/DMXCore100.Govee.Tests
 pwsh ./deploy-dev.ps1     # pack and upload to localhost:8080 (prompts for PIN)
 ```
 
-The SDK is restored from nuget.org (`DMXCore.PluginSdk` 1.*). To build
+The SDK is restored from nuget.org (`DMXCore.PluginSdk` 1.13.*). To build
 against an unpublished SDK, pack `src/PluginSdk` and `src/PluginSdk.Testing`
 from the Software repo into `local-feed/` (see the comment in
 `nuget.config`); the `.nupkg` files are git-ignored.

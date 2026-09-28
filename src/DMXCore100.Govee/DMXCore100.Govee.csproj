@@ -7,7 +7,7 @@
     <!-- The SDK generates manifest.json and PluginBuildInfo from these -->
     <PluginId>govee</PluginId>
     <PluginDisplayName>Govee</PluginDisplayName>
-    <Version>1.2.1</Version>
+    <Version>1.3.0</Version>
     <Authors>DMX Core</Authors>
 
     <!-- Plugin registry (nuget.org) package metadata. DMXCore.Plugin.* is the
@@ -24,11 +24,10 @@
          criterion; icon.png is the same 128x128 logo the SDK packages ship. -->
     <PackageIcon>icon.png</PackageIcon>
     <PackageTags>govee;lan;smart-lighting;led-strip</PackageTags>
-    <!-- Everything this plugin uses (plugin fixture profiles, generated
-         manifest, destination discovery) is SDK contract 1.6, so declare
-         that floor explicitly instead of inheriting whatever newer SDK the
-         floating 1.* reference happens to resolve to at build time. -->
-    <PluginMinSdkVersion>1.6</PluginMinSdkVersion>
+    <!-- No PluginMinSdkVersion override: the protocols declare
+         OutputProtocolDescriptor.RefreshInterval (SDK contract 1.13), so the
+         floor derived from the 1.13.* reference below is the real
+         requirement. Older Cores stay on 1.2.1. -->
   </PropertyGroup>
 
   <ItemGroup>
@@ -40,7 +39,7 @@
     <!-- ExcludeAssets="runtime": the DMX Core 100 host provides the SDK (and
          its dependencies) at runtime and always resolves them to its own
          copies, so they must not be shipped inside the .dmxplugin. -->
-    <PackageReference Include="DMXCore.PluginSdk" Version="1.*" ExcludeAssets="runtime" />
+    <PackageReference Include="DMXCore.PluginSdk" Version="1.13.*" ExcludeAssets="runtime" />
   </ItemGroup>
 
   <ItemGroup>

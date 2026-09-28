@@ -53,7 +53,7 @@ public class GoveePluginTests
         Assert.IsFalse(string.IsNullOrWhiteSpace(plugin.Info.Version));
         // The declared floor is what the manifest carries; a newer SDK at
         // build time must not raise it
-        Assert.AreEqual(new Version(1, 6), Version.Parse(PluginBuildInfo.MinSdkVersion));
+        Assert.AreEqual(new Version(1, 13), Version.Parse(PluginBuildInfo.MinSdkVersion));
     }
 
     [TestMethod]
@@ -75,6 +75,14 @@ public class GoveePluginTests
         Assert.AreEqual(GoveePlugin.PortType, color.PortType);
         Assert.AreEqual("Govee", color.PortTypeDisplayName);
         Assert.AreEqual(GoveeConstants.MaxUpdatesPerSecond, color.MaxUpdatesPerSecond);
+        foreach (var registered in host.OutputProtocols.Values)
+        {
+            Assert.AreEqual(
+                TimeSpan.FromMilliseconds(GoveeConstants.RefreshIntervalMs),
+                registered.Descriptor.RefreshInterval,
+                $"{registered.Descriptor.Id} must ask the host for an idle refresh");
+        }
+
         Assert.IsTrue(color.SupportsDestinationDiscovery);
         Assert.AreEqual(GoveePlugin.ColorProfileCode, color.SuggestedProfileCode);
         Assert.AreEqual("Govee Color RGB", color.DisplayName);

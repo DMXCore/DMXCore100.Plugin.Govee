@@ -52,13 +52,25 @@ internal sealed class GoveeSession : IPluginOutputSession
     private readonly GoveeMode mode;
     private readonly IPEndPoint endpoint;
     private readonly GoveeSessionIo io;
+    private readonly TimeSpan refreshInterval;
     private GoveeUpdate? lastSent;
+    private long lastFullSendAt;
 
-    public GoveeSession(GoveeMode mode, IPEndPoint endpoint, GoveeDatagramSender? sender)
+    /// <param name="refreshInterval">
+    /// How old the last full-state send must be before an unchanged update is
+    /// answered with the full state again; defaults to
+    /// <see cref="GoveeConstants.RefreshIntervalMs"/>.
+    /// </param>
+    public GoveeSession(
+        GoveeMode mode,
+        IPEndPoint endpoint,
+        GoveeDatagramSender? sender,
+        TimeSpan? refreshInterval = null)
     {
         this.mode = mode;
         this.endpoint = endpoint;
         this.io = new GoveeSessionIo(endpoint, sender);
+        this.refreshInterval = refreshInterval ?? TimeSpan.FromMilliseconds(GoveeConstants.RefreshIntervalMs);
     }
 
     public async Task<bool> SendAsync(ReadOnlyMemory<byte> channelValues, CancellationToken cancellationToken)
@@ -70,10 +82,23 @@ internal sealed class GoveeSession : IPluginOutputSession
 
         GoveeUpdate update = this.mode.ToUpdate(channelValues.Span);
 
+        // Normally only what changed goes out. The host's idle refresh
+        // re-delivers an unchanged look; once the last full send is old
+        // enough, answer it with the full state so a device changed behind
+        // our back (Govee app, scene) is put back. Time-gated because
+        // distinct channel values can quantize to the same update during a
+        // slow fade, and those must not each trigger three datagrams.
+        GoveeUpdate? previous = this.lastSent;
+        long now = Environment.TickCount64;
+        if (update == previous && now - this.lastFullSendAt >= this.refreshInterval.TotalMilliseconds)
+        {
+            previous = null;
+        }
+
         try
         {
             bool first = true;
-            foreach (byte[] datagram in update.DatagramsSince(this.lastSent))
+            foreach (byte[] datagram in update.DatagramsSince(previous))
             {
                 if (!first)
                 {
@@ -84,6 +109,11 @@ internal sealed class GoveeSession : IPluginOutputSession
 
                 first = false;
                 await this.io.Send(this.endpoint, datagram, cancellationToken);
+            }
+
+            if (previous == null)
+            {
+                this.lastFullSendAt = now;
             }
 
             this.lastSent = update;

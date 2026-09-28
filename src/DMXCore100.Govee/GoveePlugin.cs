@@ -30,6 +30,8 @@ public class GoveePlugin : IPlugin
     /// </summary>
     public const int RealtimeMaxUpdatesPerSecond = 40;
 
+    private static readonly TimeSpan RefreshInterval = TimeSpan.FromMilliseconds(GoveeConstants.RefreshIntervalMs);
+
     private readonly List<IDisposable> registrations = [];
     private readonly List<IDisposable> realtimeRegistrations = [];
     private readonly object realtimeGate = new();
@@ -198,6 +200,7 @@ public class GoveePlugin : IPlugin
             PortType = PortType,
             PortTypeDisplayName = "Govee",
             MaxUpdatesPerSecond = RealtimeMaxUpdatesPerSecond,
+            RefreshInterval = RefreshInterval,
             SupportsDestinationDiscovery = true,
             SuggestedProfileCode = suggestProfile ? ColorProfileCode : null,
             SuggestedPersonality = suggestProfile ? "RGB" : null,
@@ -223,6 +226,7 @@ public class GoveePlugin : IPlugin
             PortType = PortType,
             PortTypeDisplayName = "Govee",
             MaxUpdatesPerSecond = GoveeConstants.MaxUpdatesPerSecond,
+            RefreshInterval = RefreshInterval,
             SupportsDestinationDiscovery = true,
             SuggestedProfileCode = mode.ProfileCode,
             SuggestedPersonality = mode.Personality,
